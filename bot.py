@@ -10,6 +10,7 @@ import aiohttp
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+from common.constants import NOTION_CATEGORIES
 
 # 1. 환경 변수 및 장고 설정 로드
 load_dotenv()
@@ -17,22 +18,11 @@ logger.info("imports done")
 token = os.getenv("DISCORD_BOT_TOKEN")
 logger.debug(f"DISCORD_BOT_TOKEN set: {bool(token)}")
 DJANGO_API_URL = "http://web:8000/archiver/qna/"
-NOTION_CATEGORIES = [
-    "Git",
-    "Linux",
-    "DB",
-    "Python",
-    "Flask",
-    "Django",
-    "FastAPI",
-    "General",
-]
 
 # 2. 봇 설정
 intents = discord.Intents.default()
 intents.message_content = True
 intents.messages = True
-intents.message_content = True
 intents.guilds = True
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -57,16 +47,6 @@ async def call_django_api(question_text):
             timeout=aiohttp.ClientTimeout(total=120),
         ) as resp:
             return await resp.json()
-
-
-def sanitize_category(ai_answer):
-    """
-    AI 답변 내용중에 노션 카테고리 단어있는지 검사
-    """
-    for cat in NOTION_CATEGORIES:
-        if cat in ai_answer.lower():
-            return cat
-    return "General"
 
 
 async def send_long_message(reply_target, content, prefix=""):
@@ -109,33 +89,22 @@ async def on_message(message):
             result = await call_django_api(question_text)
             logger.debug(f"🔥 Django API 응답: {result}")
 
-            # 노션에 등록되있으면 링크 반환
-            if result.get("status") == "verified":
-                notion_url = result.get("notion_url")
-                msg_content = (
-                    f"**이미 정리된 질문입니다!**\n **노션링크** {notion_url}"
+            status = result.get("status")
+
+            if status == "similar_found":
+                notion_url = result.get("notion_page_url")
+                ai_ans = result.get("ai_answer", "이전 답변을 찾을 수 없습니다")
+                prefix = (
+                    f"**이미 정리된 질문입니다!**\n**노션링크** {notion_url}"
                     if notion_url
-                    else "✅ 이미 정리된 질문입니다! 노션 게시판을 확인해주세요."
+                    else "**이미 정리된 질문입니다!** 노션 게시판을 확인해주세요."
                 )
-                await send_long_message(message, msg_content)
-            elif result.get("status") == "duplicate":
-                ai_ans = result.get("ai_answer", "이전 답변을 찾을수 없습니다")
-                await send_long_message(
-                    message, ai_ans, prefix="**관리자가 노션에 정리중입니다**"
-                )
-            elif result.get("status") == "processing":
-                await message.reply(
-                    "** 새로운 질문이 접수되었습니다!**\n AI가 분석을 시작했습니다**"
-                )
-            elif result.get("status") == "new":
+                await send_long_message(message, ai_ans, prefix=prefix)
+            elif status == "new":
                 ai_ans = result.get("ai_answer", "답변 생성에 실패했습니다.")
                 await send_long_message(message, ai_ans, prefix="🆕 **분석 결과**")
-
             else:
-                current_status = result.get("status")
-                await message.reply(
-                    f" 알수 없는 서버 응답입니다 (status: {current_status})"
-                )
+                await message.reply(f"알수 없는 서버 응답입니다 (status: {status})")
 
         except Exception as e:
             await message.reply(f"❌ 서버 오류: {str(e)[:200]}")

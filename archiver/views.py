@@ -69,8 +69,11 @@ class QnABotAPIView(APIView):
     def post(self, request):
         try:
             logger.info("QnABotAPIView POST called")
-            question_text = request.data.get("question_text")
+            question_text = request.data.get("question_text", "").strip()
             image = request.FILES.get("image")
+
+            if not question_text:
+                raise ValidationError("질문을 입력해주세요")
 
             service = QnAService()
 
