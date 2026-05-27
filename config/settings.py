@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "import_export",
     "rest_framework",
     "django_q",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
@@ -192,6 +193,9 @@ Q_CLUSTER = {
 # Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+# OpenAI (임베딩)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 # Discord
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
@@ -201,3 +205,13 @@ NOTION_DB_ID = os.getenv("NOTION_DB_ID")
 NOTION_BOARD_URL = os.getenv("NOTION_BOARD_URL")
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Discord QnA Archiver API",
+    "DESCRIPTION": "Discord 봇의 질문-답변 아카이빙 API",
+    "VERSION": "1.0.0",
+}

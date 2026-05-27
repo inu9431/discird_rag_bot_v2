@@ -25,7 +25,11 @@ dependencies = [
     "whitenoise>=6.11.0",
     "pydantic>=2.12.5",
     "google-genai>=1.60.0",
+    "drf-spectacular>=0.29.0",
+    "pgvector>=0.3.0",
+    "openai>=1.0.0",
 ]
+
 
 [tool.black]
 line-length = 88
@@ -64,3 +68,4 @@ addopts = [
 
 [tool.setuptools]
 packages = ["config", "common", "archiver"]
+
