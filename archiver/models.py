@@ -1,6 +1,6 @@
-from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django_q.tasks import async_task
+from pgvector.django import VectorField, IvfflatIndex
 
 
 class QnALog(models.Model):
@@ -26,6 +26,8 @@ class QnALog(models.Model):
         verbose_name="상위 질문",
     )
 
+    embedding = VectorField(dimensions=1536, null=True, blank=True)
+
     notion_page_url = models.URLField(
         max_length=500, null=True, blank=True, verbose_name="노션 페이지 링크"
     )
@@ -41,10 +43,10 @@ class QnALog(models.Model):
         ordering = ["-created_at"]
 
         indexes = [
-            GinIndex(
-                fields=["question_text"],
-                name="qna_question_tgrm_idx",
-                opclasses=["gin_trgm_ops"],
+            IvfflatIndex(
+                fields=["embedding"],
+                name="qna_embedding_ivfflat_idx",
+                lists=100,
             ),
         ]
 
