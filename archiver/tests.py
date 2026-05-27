@@ -56,7 +56,14 @@ def mock_notion_adapter():
         mock_instance = MockNotion.return_value
         mock_instance.create_qna_page.return_value = "https://notion.so/fake-page-123"
         yield mock_instance
-        
+
+@pytest.fixture
+def mock_embedding_adapter():
+    with patch("archiver.services.OpenAIEmbeddingAdapter") as MockEmbedding:
+        mock_instance = MockEmbedding.return_value
+        mock_instance.embed.return_value = [0.1] * 1536
+        yield mock_instance
+
 # ==================================================================================
 # 기능 테스트
 # ==================================================================================
@@ -64,7 +71,7 @@ def mock_notion_adapter():
 class TestQnABotAPI:
     """QnABotAPIVIEW의 주요 기능 흐름을 테스트합니다"""
 
-    def test_new_question_flow(self, api_client, qna_bot_url, mock_gemini_adapter, mock_notion_adapter):
+    def test_new_question_flow(self, api_client, qna_bot_url, mock_gemini_adapter, mock_notion_adapter, mock_embedding_adapter):
         """
         [통합 테스트/성공] 실규 질문 시, View-Service-DB 연동 및 AI 응답 처리 흐름을 검증
         """
@@ -96,7 +103,7 @@ class TestQnABotAPI:
 
         mock_notion_adapter.create_qna_page.assert_called_once_with(created_log)
 
-    def test_ai_response_parsing_failure(self, api_client, qna_bot_url, mock_gemini_adapter, mock_notion_adapter):
+    def test_ai_response_parsing_failure(self, api_client, qna_bot_url, mock_gemini_adapter, mock_notion_adapter, mock_embedding_adapter):
         """
         [통합 테스트] AI 응답이 예상과 다른 형식일떄, 파싱 에러를  핸들링하는지 검증
         """
@@ -112,7 +119,7 @@ class TestQnABotAPI:
         mock_notion_adapter.create_qna_page.assert_not_called()
 
 
-    def test_notion_api_failure(self, api_client, qna_bot_url, mock_gemini_adapter, mock_notion_adapter):
+    def test_notion_api_failure(self, api_client, qna_bot_url, mock_gemini_adapter, mock_notion_adapter, mock_embedding_adapter):
         """
         [통합 테스트 성공] Notion 저장에 실패하더라도, 전체 흐름은 중단되지 않고 성공 응답을 반환하는지 검증
         """
@@ -465,7 +472,7 @@ class TestGeminiAdapter:
     """GeminiAdapter 단위 테스트"""
 
     @patch("archiver.adapters.genai")
-    @override_settings(Gemini_API_KEY= 'test-api-key')
+    @override_settings(GEMINI_API_KEY='test-api-key')
     def test_generate_answer_success(self, mock_genai):
         """AI 응답 성공시 QnACreateDTO 반환"""
 
