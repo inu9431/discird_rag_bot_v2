@@ -140,6 +140,8 @@ def mock_qna_service():
         service = QnAService()
         service.gemini = MagicMock()
         service.notion = MagicMock()
+        service.embedding = MagicMock()
+        service.embedding.embed.return_value = [0.1] * 1536
         yield service
 
 
@@ -162,6 +164,7 @@ class TestCheckSimilarity:
             ai_answer = "ORM 사용법 답변",
             is_verified = True,
             hit_count = 5,
+            embedding = [0.1] * 1536,
         )
 
         result = mock_qna_service.check_similarity("Django ORM 사용법")
@@ -531,7 +534,7 @@ class TestGeminiAdapter:
 
         adapter = GeminiAdapter()
 
-        with pytest.raises(LLMServiceError, match= "할달량 초과"):
+        with pytest.raises(LLMServiceError, match="할당량 초과"):
             adapter.generate_answer("테스트 질문")
 
     @override_settings(GEMINI_API_KEY=None)
@@ -645,7 +648,7 @@ class TestProcessQuestionFlowFailure:
             with pytest.raises(DatabaseOperationError, match="데이터베이스"):
                 mock_qna_service.process_question_flow("테스트 질문")
 
-@pytest.mark.djang_db
+@pytest.mark.django_db
 class  TestQnALogModel:
     """QnALog 모델 테스트"""
 
