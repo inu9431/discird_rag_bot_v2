@@ -1,11 +1,13 @@
 services:
   db:
-    image: postgres:15
+    image: pgvector/pgvector:pg15
     env_file: .env
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-bot_user}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me}
       - POSTGRES_DB=${POSTGRES_DB:-bot_db}
+    ports:
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

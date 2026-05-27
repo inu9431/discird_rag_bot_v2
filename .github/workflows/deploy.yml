@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:15
+        image: pgvector/pgvector:pg15
         env:
           POSTGRES_DB: test_db
           POSTGRES_USER: test_user
@@ -43,6 +43,7 @@ jobs:
           echo "DISCORD_BOT_TOKEN=${{ secrets.DISCORD_BOT_TOKEN }}" >> .env
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
           echo "DATABASE_URL=postgres://test_user:test_password@localhost:5432/test_db" >> .env
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
 
       - name: Run tests
         run: uv run pytest -v
@@ -132,3 +133,6 @@ jobs:
 #
 #            sudo docker image prune -f
 #            echo "🎉 배포 성공!"
+
+
+
