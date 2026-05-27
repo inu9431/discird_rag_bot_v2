@@ -4,9 +4,10 @@ import re
 import io
 from typing import List, Optional, Union
 from common.constants import NOTION_CATEGORIES
-import google.genai as genai
+import google.generativeai as genai
 import requests
 from django.conf import settings
+from openai import OpenAI
 from PIL import Image
 
 from common.exceptions import LLMServiceError, NotionAPIError
@@ -86,27 +87,35 @@ class GeminiAdapter:
                 genai.configure(api_key=api_key)
             GeminiAdapter._client_configured = True
 
-    def _build_prompt(self, question_text: str) -> str:
-        """AI에게 보낼 프롬프트를 구성합니다"""
-        return f"""                                                                                                                                                           
-        너는 불필요한 설명을 하지 않는 실력파 개발 조교야.                                                                                                                    
-        인사말은 생략하고 다음 구조로 핵심만 짧게 답해줘.                                                                                                                     
-        [메타데이터]                                                                                                                                                          
-        제목: (질문의 핵심 의도를 한문장으로)                                                                                                                                 
-        카테고리: (다음중 하나 선택 - {",".join(NOTION_CATEGORIES)})                                                                                                     
-        키워드: (핵심 키워드 3개를 쉼표로 구분)                                                                                                                               
+    def _build_prompt(self, question_text: str, context: str = "") -> str:
+        context_section = ""
+        if context:
+            context_section = f"""
+[참고 Q&A - 유사한 기존 질문과 답변]
+{context}
 
-        [출력 양식]                                                                                                                                                           
-        제목: (질문의 핵심 의도를 한 문장으로 요약)                                                                                                                           
-        1. **문제 요약**: (에러 정체 1문장)                                                                                                                                   
-        2. **핵심 원인**: (이유 1~2개 불렛 포인트)                                                                                                                            
-        3. **해결 코드**: (중요 코드 블록. 설명은 주석으로)                                                                                                                   
-        4. **체크포인트**: (실수 방지 팁 하나)                                                                                                                                
+위 참고 자료를 활용해서 답변해줘.
+"""
 
-        질문 내용: {question_text}                                                                                                                                            
-        """
+        return f"""너는 불필요한 설명을 하지 않는 실력파 개발 조교야.
+인사말은 생략하고 다음 구조로 핵심만 짧게 답해줘.
 
-    def generate_answer(self, question_text: str, image_data: Optional[bytes] = None) -> QnACreateDTO:
+[메타데이터]
+제목: (질문의 핵심 의도를 한문장으로)
+카테고리: (다음중 하나 선택 - {",".join(NOTION_CATEGORIES)})
+키워드: (핵심 키워드 3개를 쉼표로 구분)
+
+[출력 양식]
+제목: (질문의 핵심 의도를 한 문장으로 요약)
+1. **문제 요약**: (에러 정체 1문장)
+2. **핵심 원인**: (이유 1~2개 불렛 포인트)
+3. **해결 코드**: (중요 코드 블록. 설명은 주석으로)
+4. **체크포인트**: (실수 방지 팁 하나)
+{context_section}
+질문 내용: {question_text}
+"""
+
+    def generate_answer(self, question_text: str, image_data: Optional[bytes] = None, context: str = "") -> QnACreateDTO:
         self._setup_client()
 
 
@@ -118,7 +127,7 @@ class GeminiAdapter:
                 logger.info("이미지 로딩 성공")
             except Exception as e:
                 logger.warning(f"이미지 로딩 에러: {e}")
-        prompt = self._build_prompt(question_text)
+        prompt = self._build_prompt(question_text, context)
         content_parts.append(prompt)
 
         try:
@@ -162,6 +171,23 @@ class GeminiAdapter:
             logger.error(f"Gemini API 에러 {e}", exc_info=True)
             # 더이상 클라이언트 미지원 에러를 던지지말고 실제 발생 에러를 전달
             raise LLMServiceError(f"AI 응답 생성 실패: {str(e)}")
+
+
+class OpenAIEmbeddingAdapter:
+    """OpenAI text-embedding-3-small 임베딩 어댑터"""
+
+    def __init__(self):
+        api_key = getattr(settings, "OPENAI_API_KEY", None)
+        if not api_key:
+            raise LLMServiceError("OPENAI_API_KEY가 설정되지 않았습니다")
+        self.client = OpenAI(api_key=api_key)
+
+    def embed(self, text: str) -> list[float]:
+        response = self.client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text,
+        )
+        return response.data[0].embedding
 
 
 class NotionAdapter:

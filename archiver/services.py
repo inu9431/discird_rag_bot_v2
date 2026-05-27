@@ -1,13 +1,12 @@
 import logging
+from typing import Optional
 
-from django.contrib.postgres.search import TrigramSimilarity
 from django.core.files.uploadedfile import UploadedFile
+from pgvector.django import CosineDistance
 
-from .adapters import GeminiAdapter, NotionAdapter
+from .adapters import GeminiAdapter, NotionAdapter, OpenAIEmbeddingAdapter, qna_model_to_response_dto
 from .models import QnALog
 from common.exceptions import AIResponseParsingError, DatabaseOperationError, ValidationError
-from typing import Optional
-from .adapters import qna_model_to_response_dto
 
 logger = logging.getLogger(__name__)
 
@@ -17,21 +16,19 @@ class QnAService:
     def __init__(self):
         self.gemini = GeminiAdapter()
         self.notion = NotionAdapter()
+        self.embedding = OpenAIEmbeddingAdapter()
 
-    def check_similarity(self, question_text: str, threshold=0.6):
-        """
-        PostgreSQL의 pg_trgm을 사용하여 기존 질문들과 유사도 비교
-        """
-        logger.debug("============== PostgreSQL 유사도 체크 시작 ==============")
+    def check_similarity(self, question_text: str, threshold=0.2):
+        """pgvector 코사인 거리로 유사 질문 검색 (distance < threshold = 유사)"""
+        logger.debug("============== pgvector 유사도 체크 시작 ==============")
 
-        # 1. TrigramSimilarity를 사용하여 유사도 계산 및 필터링
+        query_embedding = self.embedding.embed(question_text)
 
         similar_log = (
-            QnALog.objects.annotate(
-                similarity=TrigramSimilarity("question_text", question_text)
-            )
-            .filter(is_verified=True, similarity__gt=threshold)
-            .order_by("-similarity")
+            QnALog.objects.filter(embedding__isnull=False, is_verified=True)
+            .annotate(distance=CosineDistance("embedding", query_embedding))
+            .filter(distance__lt=threshold)
+            .order_by("distance")
             .first()
         )
 
@@ -58,6 +55,24 @@ class QnAService:
             'data': response_data
         }
 
+    def retrieve_context(self, question_text: str, top_k: int = 3) -> str:
+        """유사 Q&A top-k를 검색해 RAG 컨텍스트 문자열로 반환"""
+        query_embedding = self.embedding.embed(question_text)
+
+        related = (
+            QnALog.objects.filter(embedding__isnull=False, is_verified=True)
+            .annotate(distance=CosineDistance("embedding", query_embedding))
+            .filter(distance__lt=0.5)
+            .order_by("distance")[:top_k]
+        )
+
+        if not related:
+            return ""
+
+        return "\n\n".join(
+            f"Q: {log.question_text}\nA: {log.ai_answer}" for log in related
+        )
+
     def process_question_flow(self, question_text: str, image: Optional[UploadedFile] = None) -> QnALog:
         """
         이미 생성된 log_obj를 받아서 AI 분석 결과로 업데이트
@@ -70,7 +85,8 @@ class QnAService:
             if image:
                 image_data = image.read()
 
-            dto = self.gemini.generate_answer(question_text, image_data)
+            context = self.retrieve_context(question_text)
+            dto = self.gemini.generate_answer(question_text, image_data, context=context)
 
 
 
@@ -82,6 +98,12 @@ class QnAService:
                 keywords=dto.keywords,
                 image=image,
             )
+
+            try:
+                log_obj.embedding = self.embedding.embed(question_text)
+                log_obj.save(update_fields=["embedding"])
+            except Exception as e:
+                logger.warning(f"임베딩 저장 실패 ID:{log_obj.id}: {e}")
 
             try:
                 notion_page_url = self.notion.create_qna_page(log_obj)

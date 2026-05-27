@@ -6,7 +6,7 @@ class BaseProjectError(Exception):
         super().__init__(self.message)
 
 
-class LLMServiceError(BaseProjectError):
+class LLMServiceError(BaseProjectError): # 서비스 -> 에러 raise -> 메세지 -> 뷰에서 반환
     """Gemini API 등 AI 관련 오류"""
 
     pass

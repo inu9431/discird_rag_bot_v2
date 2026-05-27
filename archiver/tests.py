@@ -705,3 +705,4 @@ class  TestQnALogModel:
         )
 
         assert str(log) == "[Django] 테스트 제목 (빈도: 5)"
+        
