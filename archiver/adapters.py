@@ -79,12 +79,8 @@ class GeminiAdapter:
     def _setup_client(self):
         # Lazy Singleton: 설정이 안되있을떄만 실행
         if not GeminiAdapter._client_configured:
-            api_key = self.api_key or os.getenv("GEMINI_API_KEY")
-            if not api_key:
-                raise LLMServiceError("GEMINI_API_KEY missing")
-            # prefer configure if available
             if hasattr(genai, "configure"):
-                genai.configure(api_key=api_key)
+                genai.configure(api_key=self.api_key)
             GeminiAdapter._client_configured = True
 
     def _build_prompt(self, question_text: str, context: str = "") -> str:
@@ -106,7 +102,6 @@ class GeminiAdapter:
 키워드: (핵심 키워드 3개를 쉼표로 구분)
 
 [출력 양식]
-제목: (질문의 핵심 의도를 한 문장으로 요약)
 1. **문제 요약**: (에러 정체 1문장)
 2. **핵심 원인**: (이유 1~2개 불렛 포인트)
 3. **해결 코드**: (중요 코드 블록. 설명은 주석으로)
@@ -159,17 +154,14 @@ class GeminiAdapter:
                 ai_raw_text =response.text
             )
 
+        except LLMServiceError:
+            raise
         except Exception as e:
-            if isinstance(e, LLMServiceError):
-                raise e
-
             msg = str(e).lower()
-            # 힐당량 초과 및 기타 에러 핸들링
             if "quota" in msg or "rate" in msg:
                 logger.warning(f" Quota/Rate limit error {e}")
-                raise LLMServiceError("API 할달량 초과, 나중에 재시도하세여")
+                raise LLMServiceError("API 할당량 초과, 나중에 재시도하세요")
             logger.error(f"Gemini API 에러 {e}", exc_info=True)
-            # 더이상 클라이언트 미지원 에러를 던지지말고 실제 발생 에러를 전달
             raise LLMServiceError(f"AI 응답 생성 실패: {str(e)}")
 
 
