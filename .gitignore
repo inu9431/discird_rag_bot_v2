@@ -30,3 +30,7 @@ db.sqlite3
 .DS_Store
 repomix-output.xml
 dir/
+
+# Claude
+CLAUDE.md
+.claude/
