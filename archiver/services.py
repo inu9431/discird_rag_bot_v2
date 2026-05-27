@@ -6,7 +6,7 @@ from pgvector.django import CosineDistance
 
 from .adapters import GeminiAdapter, NotionAdapter, OpenAIEmbeddingAdapter, qna_model_to_response_dto
 from .models import QnALog
-from common.exceptions import AIResponseParsingError, DatabaseOperationError, ValidationError
+from common.exceptions import AIResponseParsingError, DatabaseOperationError, LLMServiceError, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +55,10 @@ class QnAService:
             'data': response_data
         }
 
-    def retrieve_context(self, question_text: str, top_k: int = 3) -> str:
+    def retrieve_context(self, question_text: str, query_embedding: list = None, top_k: int = 3) -> str:
         """유사 Q&A top-k를 검색해 RAG 컨텍스트 문자열로 반환"""
-        query_embedding = self.embedding.embed(question_text)
+        if query_embedding is None:
+            query_embedding = self.embedding.embed(question_text)
 
         related = (
             QnALog.objects.filter(embedding__isnull=False, is_verified=True)
@@ -74,9 +75,7 @@ class QnAService:
         )
 
     def process_question_flow(self, question_text: str, image: Optional[UploadedFile] = None) -> QnALog:
-        """
-        이미 생성된 log_obj를 받아서 AI 분석 결과로 업데이트
-        """
+        """신규 질문을 임베딩·AI 분석·Notion 업로드까지 처리하고 QnALog를 반환"""
         try:
             if not question_text:
                 raise ValidationError("질문을 입력해주세요")
@@ -85,10 +84,9 @@ class QnAService:
             if image:
                 image_data = image.read()
 
-            context = self.retrieve_context(question_text)
+            query_embedding = self.embedding.embed(question_text)
+            context = self.retrieve_context(question_text, query_embedding=query_embedding)
             dto = self.gemini.generate_answer(question_text, image_data, context=context)
-
-
 
             log_obj = QnALog.objects.create(
                 question_text=question_text,
@@ -100,7 +98,7 @@ class QnAService:
             )
 
             try:
-                log_obj.embedding = self.embedding.embed(question_text)
+                log_obj.embedding = query_embedding
                 log_obj.save(update_fields=["embedding"])
             except Exception as e:
                 logger.warning(f"임베딩 저장 실패 ID:{log_obj.id}: {e}")
@@ -124,6 +122,8 @@ class QnAService:
         except AIResponseParsingError:
             raise
         except ValidationError:
+            raise
+        except LLMServiceError:
             raise
         except Exception as e:
             logger.error(f"데이터베이스 저장 중 오류 발생: {e}", exc_info=True)
