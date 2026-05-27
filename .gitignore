@@ -1,0 +1,36 @@
+__pycache__/
+.pytest_cache/
+.env
+logs/
+Logs/
+.idea/
+11..claude
+*.pyc
+.DS_Store
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Django
+db.sqlite3
+/logs/
+*.log
+
+# IDE
+.idea/
+.vscode/
+
+# Environment
+.env
+
+# OS
+.DS_Store
+repomix-output.xml
+dir/
+
+# Claude
+CLAUDE.md
+.claude/

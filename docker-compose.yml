@@ -1,0 +1,58 @@
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    env_file: .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-bot_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change_me}
+      - POSTGRES_DB=${POSTGRES_DB:-bot_db}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    # Development: use Django runserver for autoreload. Production override file will switch to gunicorn.
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8001:8000"
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+
+  bot:
+    build: .
+    command: python bot.py
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
+    volumes:
+      - .:/app
+
+  worker:
+    build: .
+    command: python manage.py qcluster
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
+    volumes:
+      - .:/app
+    restart: always
+
+volumes:
+  postgres_data:

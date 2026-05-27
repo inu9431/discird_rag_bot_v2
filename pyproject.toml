@@ -1,0 +1,71 @@
+[project]
+name = "discord-qna-archiver"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "google-generativeai>=0.8.3",
+    "discord-py>=2.6.4",
+    "django>=6.0",
+    "django-import-export>=4.3.14",
+    "djangorestframework>=3.16.1",
+    "pillow>=12.0.0",
+    "psycopg[binary]>=3.3.2",
+    "pyparsing>=3.3.1",
+    "python-dotenv>=1.2.1",
+    "requests>=2.32.5",
+    "pytest>=9.0.2",
+    "pytest-django>=4.9.0",
+    "django-environ>=0.12.0",
+    "django-q2>=1.9.0",
+    "gunicorn>=23.0.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+    "whitenoise>=6.11.0",
+    "pydantic>=2.12.5",
+    "google-genai>=1.60.0",
+    "drf-spectacular>=0.29.0",
+    "pgvector>=0.3.0",
+    "openai>=1.0.0",
+]
+
+
+[tool.black]
+line-length = 88
+target-version = ['py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | migrations
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+skip_gitignore = true
+known_first_party = ["config", "archiver"]  # 본인 앱 이름으로 수정
+skip = ["migrations", ".venv"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+pythonpath = ["."]  # ← 추가
+addopts = [
+    "-v",
+    "--reuse-db",  # ← DB 재사용으로 속도 향상
+]
+
+[tool.setuptools]
+packages = ["config", "common", "archiver"]
+
