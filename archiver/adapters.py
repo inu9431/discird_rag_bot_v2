@@ -4,7 +4,8 @@ import re
 import io
 from typing import List, Optional, Union
 from common.constants import NOTION_CATEGORIES
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import requests
 from django.conf import settings
 from openai import OpenAI
@@ -68,20 +69,11 @@ def qna_model_to_response_dto(qna: QnALog) -> QnAResponseDTO:
 class GeminiAdapter:
     """Gemini API와 통신을 전담하는 어댑터"""
 
-    _client_configured = False  # 클래스 변수로 설정 여부 관리
-
     def __init__(self):
         self.api_key = getattr(settings, "GEMINI_API_KEY", None)
         if not self.api_key:
             raise LLMServiceError("GEMINI_API_KEY가 설정되지 않았습니다")
-        # do not configure client here; lazy configure in _setup_client
-
-    def _setup_client(self):
-        # Lazy Singleton: 설정이 안되있을떄만 실행
-        if not GeminiAdapter._client_configured:
-            if hasattr(genai, "configure"):
-                genai.configure(api_key=self.api_key)
-            GeminiAdapter._client_configured = True
+        self._client = genai.Client(api_key=self.api_key)
 
     def _build_prompt(self, question_text: str, context: str = "") -> str:
         context_section = ""
@@ -111,14 +103,12 @@ class GeminiAdapter:
 """
 
     def generate_answer(self, question_text: str, image_data: Optional[bytes] = None, context: str = "") -> QnACreateDTO:
-        self._setup_client()
-
-
         content_parts = []
         if image_data:
             try:
                 img = Image.open(io.BytesIO(image_data))
-                content_parts.append(img)
+                mime_type = f"image/{img.format.lower()}" if img.format else "image/jpeg"
+                content_parts.append(types.Part.from_bytes(data=image_data, mime_type=mime_type))
                 logger.info("이미지 로딩 성공")
             except Exception as e:
                 logger.warning(f"이미지 로딩 에러: {e}")
@@ -126,22 +116,17 @@ class GeminiAdapter:
         content_parts.append(prompt)
 
         try:
-            # 모델 선언 및 호출 방식 단순화 (표준 SDK방식)
-            model = genai.GenerativeModel("models/gemini-2.5-flash")
-
-            # 안전 설정 및 생성 설정 추가
-            response = model.generate_content(
-                content_parts,
-                generation_config=genai.types.GenerationConfig(
+            response = self._client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=content_parts,
+                config=types.GenerateContentConfig(
                     max_output_tokens=2048, temperature=0.7
                 ),
             )
 
-            # 응답 텍스트 추출 로직 간소화
-            if response.prompt_feedback.block_reason:
+            if response.prompt_feedback and response.prompt_feedback.block_reason:
                 block_reason = response.prompt_feedback.block_reason
-                logger.warning(
-                    f"Gemini 응답 차단되었습니다. 이유: {block_reason}")
+                logger.warning(f"Gemini 응답 차단되었습니다. 이유: {block_reason}")
                 raise LLMServiceError(f"AI 응답이 차단되었습니다: {block_reason}")
 
             if not response.text:

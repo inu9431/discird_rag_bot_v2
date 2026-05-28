@@ -83,7 +83,7 @@ SECRET_KEY = env("SECRET_KEY", default="django-insecure-please-set-secret-in-env
 # Read DEBUG from env (bool conversion)
 DEBUG = env.bool("DEBUG", default=False)
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "web", "*"]
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "web"])
 
 
 # Application definition

@@ -1,5 +1,3 @@
-from unicodedata import category
-
 import pytest
 import requests
 from django.test import TestCase, override_settings
@@ -475,19 +473,16 @@ class TestGeminiAdapter:
     @override_settings(GEMINI_API_KEY='test-api-key')
     def test_generate_answer_success(self, mock_genai):
         """AI 응답 성공시 QnACreateDTO 반환"""
-
+        mock_client = mock_genai.Client.return_value
         mock_response = MagicMock()
-        mock_response.prompt_feedback.block_reason = None
+        mock_response.prompt_feedback = None
         mock_response.text = """제목: Django ORM 최적화
-카테고리: Django                                                                                                                                                              
-키워드: ORM, 쿼리셋, 최적화                                                                                                                                                   
-                                                                                                                                                                        
-1. **문제 요약**: N+1 쿼리 문제      
-"""
+카테고리: Django
+키워드: ORM, 쿼리셋, 최적화
 
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = mock_response
-        mock_genai.GenerativeModel.return_value = mock_model
+1. **문제 요약**: N+1 쿼리 문제
+"""
+        mock_client.models.generate_content.return_value = mock_response
 
         adapter = GeminiAdapter()
         result = adapter.generate_answer("Django ORM 최적화 방법")
@@ -500,13 +495,10 @@ class TestGeminiAdapter:
     @override_settings(GEMINI_API_KEY='test-api-key')
     def test_generate_answer_blocked_response(self, mock_genai):
         """AI 응답이 차단되면 LLMServiceError 발생"""
-
+        mock_client = mock_genai.Client.return_value
         mock_response = MagicMock()
         mock_response.prompt_feedback.block_reason = "SAFETY"
-
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = mock_response
-        mock_genai.GenerativeModel.return_value = mock_model
+        mock_client.models.generate_content.return_value = mock_response
 
         adapter = GeminiAdapter()
 
@@ -517,14 +509,12 @@ class TestGeminiAdapter:
     @override_settings(GEMINI_API_KEY='test-api-key')
     def test_generate_answer_empty_response(self, mock_genai):
         """AI 응답이 비어있으면 LLMServiceError 발생"""
+        mock_client = mock_genai.Client.return_value
         mock_response = MagicMock()
-        mock_response.prompt_feedback.block_reason = None
+        mock_response.prompt_feedback = None
         mock_response.text = None
         mock_response.candidates = []
-
-        mock_model = MagicMock()
-        mock_model.generate_content.return_value = mock_response
-        mock_genai.GenerativeModel.return_value = mock_model
+        mock_client.models.generate_content.return_value = mock_response
 
         adapter = GeminiAdapter()
 
@@ -534,10 +524,9 @@ class TestGeminiAdapter:
     @patch("archiver.adapters.genai")
     @override_settings(GEMINI_API_KEY="test-api-key")
     def test_generate_answer_quota_exceeded(self, mock_genai):
-        """API 할달량 초과시 LLMServiceError 발생"""
-        mock_model = MagicMock()
-        mock_model.generate_content.side_effect = Exception("quota exceeded")
-        mock_genai.GenerativeModel.return_value = mock_model
+        """API 할당량 초과시 LLMServiceError 발생"""
+        mock_client = mock_genai.Client.return_value
+        mock_client.models.generate_content.side_effect = Exception("quota exceeded")
 
         adapter = GeminiAdapter()
 
