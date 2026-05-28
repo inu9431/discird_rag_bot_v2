@@ -93,13 +93,10 @@ async def on_message(message):
 
             if status == "similar_found":
                 notion_url = result.get("notion_page_url")
-                ai_ans = result.get("ai_answer", "이전 답변을 찾을 수 없습니다")
-                prefix = (
-                    f"**이미 정리된 질문입니다!**\n**노션링크** {notion_url}"
-                    if notion_url
-                    else "**이미 정리된 질문입니다!** 노션 게시판을 확인해주세요."
-                )
-                await send_long_message(message, ai_ans, prefix=prefix)
+                if notion_url:
+                    await message.reply(f"**이미 정리된 질문입니다!**\n**노션링크** {notion_url}")
+                else:
+                    await message.reply("**이미 정리된 질문입니다!** 노션 게시판을 확인해주세요.")
             elif status == "new":
                 ai_ans = result.get("ai_answer", "답변 생성에 실패했습니다.")
                 await send_long_message(message, ai_ans, prefix="🆕 **분석 결과**")
