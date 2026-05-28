@@ -44,6 +44,7 @@ class QnAResponseDTO(BaseModel):
         image_path: Optional[str] = None
         ai_answer: Optional[str] = None
         hit_count: Optional[int] = 1
+        notion_page_url: Optional[str] = None
         created_at: Optional[datetime] = None
 
         @field_validator("keywords", mode='before')

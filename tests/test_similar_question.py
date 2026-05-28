@@ -63,6 +63,20 @@ class TestSimilarQuestion:
         verified_qna.refresh_from_db()
         assert verified_qna.hit_count == 6
 
+    def test_similar_question_response_includes_notion_url(
+            self, api_client, qna_bot_url,
+            mock_embedding_adapter, mock_gemini_adapter, mock_notion_adapter,
+            verified_qna):
+        response = api_client.post(
+            qna_bot_url,
+            {"question_text": "파이썬 리스트 사용법 알려주세요"},
+            format="json",
+        )
+        data = response.json()
+
+        assert data["status"] == "similar_found"
+        assert data["notion_page_url"] == "https://notion.so/existing-page"
+
     def test_unverified_question_treated_as_new(
             self, api_client, qna_bot_url,
             mock_embedding_adapter, mock_gemini_adapter, mock_notion_adapter):
